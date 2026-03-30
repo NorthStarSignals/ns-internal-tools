@@ -1,0 +1,42 @@
+{
+  "name": "ns-internal-tools",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@clerk/nextjs": "^7.0.7",
+    "@react-pdf/renderer": "^4.0.0",
+    "@supabase/supabase-js": "^2.100.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "docx": "^9.0.0",
+    "lucide-react": "^1.7.0",
+    "mammoth": "^1.8.0",
+    "next": "^15.3.0",
+    "pdf-parse": "^1.1.1",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-hot-toast": "^2.6.0",
+    "recharts": "^3.8.1",
+    "snowflake-sdk": "^1.14.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.27",
+    "eslint": "^9",
+    "eslint-config-next": "^15.3.0",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
