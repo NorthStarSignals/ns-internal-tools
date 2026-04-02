@@ -17,6 +17,12 @@ import {
   Settings,
   Menu,
   X,
+  Clock,
+  ClipboardList,
+  DollarSign,
+  Users,
+  FolderOpen,
+  Receipt,
 } from "lucide-react";
 
 const rfpLinks = [
@@ -28,6 +34,16 @@ const rfpLinks = [
 const dealLinks = [
   { href: "/dashboard/deals", label: "Deals", icon: Search },
   { href: "/dashboard/deals/benchmarks", label: "Benchmarks", icon: BarChart3 },
+];
+
+const timeTrackerLinks = [
+  { href: "/dashboard/time-tracker", label: "Timer", icon: Clock },
+  { href: "/dashboard/time-tracker/my-hours", label: "My Hours", icon: ClipboardList },
+  { href: "/dashboard/time-tracker/my-pay", label: "My Pay", icon: DollarSign },
+  { href: "/dashboard/time-tracker/entries", label: "All Entries", icon: ClipboardList, adminOnly: true },
+  { href: "/dashboard/time-tracker/contractors", label: "Contractors", icon: Users, adminOnly: true },
+  { href: "/dashboard/time-tracker/projects", label: "Projects", icon: FolderOpen, adminOnly: true },
+  { href: "/dashboard/time-tracker/pay-reports", label: "Pay Reports", icon: Receipt, adminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -110,6 +126,30 @@ export default function Sidebar() {
                   (link.href === "/dashboard/deals"
                     ? pathname === "/dashboard/deals" || (pathname.startsWith("/dashboard/deals/") && !pathname.startsWith("/dashboard/deals/benchmarks"))
                     : true)
+                  ? "bg-accent-blue/20 text-accent-blue"
+                  : "text-slate-300 hover:bg-navy-700 hover:text-white"
+              )}
+            >
+              <link.icon size={18} />
+              {!collapsed && link.label}
+            </Link>
+          ))}
+        </div>
+
+        <div>
+          {!collapsed && (
+            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Time Tracker
+            </p>
+          )}
+          {timeTrackerLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                pathname === link.href ||
+                  (link.href === "/dashboard/time-tracker" && pathname === "/dashboard/time-tracker")
                   ? "bg-accent-blue/20 text-accent-blue"
                   : "text-slate-300 hover:bg-navy-700 hover:text-white"
               )}
