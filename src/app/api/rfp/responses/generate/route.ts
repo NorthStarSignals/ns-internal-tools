@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaude } from "@/lib/claude";
 import { RESPONSE_GENERATION_PROMPT } from "@/lib/claude-prompts";
+import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 60;
 import { RfpRequirement, CompanyProfile, KnowledgeBaseEntry } from "@/lib/types";
@@ -177,81 +178,93 @@ export async function POST(request: NextRequest) {
 
     const allKB: KnowledgeBaseEntry[] = kbEntries || [];
 
-    // Generate responses for each requirement
-    const generatedResponses = [];
-
-    for (const requirement of requirements) {
-      // Check if a response already exists
-      const { data: existing } = await supabase
-        .from("rfp_responses")
-        .select("response_id")
-        .eq("requirement_id", requirement.requirement_id)
-        .eq("project_id", project_id)
-        .single();
-
-      if (existing) {
-        // Skip requirements that already have responses
-        continue;
-      }
-
-      const relevantKB = getRelevantKBEntries(requirement, allKB);
-      const userMessage = buildPromptForRequirement(
-        requirement,
+    // Use waitUntil for background generation and return 202 immediately
+    waitUntil(
+      generateResponsesInBackground(
+        supabase,
+        project_id,
+        requirements,
         profile,
-        relevantKB,
+        allKB,
         project.contract_type
-      );
+      )
+    );
 
-      try {
-        const draftText = await askClaude(RESPONSE_GENERATION_PROMPT, userMessage, {
-          maxTokens: 4096,
-          temperature: 0.3,
-        });
-
-        const kbSourceId = relevantKB.length > 0 ? relevantKB[0].entry_id : null;
-
-        // Update times_used for KB entries that were referenced
-        if (relevantKB.length > 0) {
-          for (const kb of relevantKB) {
-            await supabase
-              .from("rfp_knowledge_base")
-              .update({ times_used: (kb.times_used || 0) + 1 })
-              .eq("entry_id", kb.entry_id);
-          }
-        }
-
-        const { data: response, error: insertError } = await supabase
-          .from("rfp_responses")
-          .insert({
-            requirement_id: requirement.requirement_id,
-            project_id,
-            draft_text: draftText,
-            status: "draft",
-            ai_confidence: relevantKB.length > 0 ? 0.8 : 0.6,
-            kb_source_id: kbSourceId,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error(`Failed to insert response for ${requirement.requirement_id}:`, insertError);
-          continue;
-        }
-
-        generatedResponses.push(response);
-      } catch (genErr) {
-        console.error(`Failed to generate response for ${requirement.requirement_id}:`, genErr);
-        continue;
-      }
-    }
-
-    return NextResponse.json({
-      generated_count: generatedResponses.length,
-      total_requirements: requirements.length,
-      responses: generatedResponses,
-    });
+    return NextResponse.json(
+      {
+        message: "Response generation started",
+        status: "processing",
+        total_requirements: requirements.length,
+      },
+      { status: 202 }
+    );
   } catch (err) {
     console.error("POST /api/rfp/responses/generate error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function generateResponsesInBackground(
+  supabase: ReturnType<typeof createServerSupabase>,
+  projectId: string,
+  requirements: RfpRequirement[],
+  profile: CompanyProfile | null,
+  allKB: KnowledgeBaseEntry[],
+  contractType: string | null
+) {
+  for (const requirement of requirements) {
+    // Check if a response already exists
+    const { data: existing } = await supabase
+      .from("rfp_responses")
+      .select("response_id")
+      .eq("requirement_id", requirement.requirement_id)
+      .eq("project_id", projectId)
+      .single();
+
+    if (existing) continue;
+
+    const relevantKB = getRelevantKBEntries(requirement, allKB);
+    const userMessage = buildPromptForRequirement(
+      requirement,
+      profile,
+      relevantKB,
+      contractType
+    );
+
+    try {
+      const draftText = await askClaude(RESPONSE_GENERATION_PROMPT, userMessage, {
+        maxTokens: 4096,
+        temperature: 0.3,
+      });
+
+      const kbSourceId = relevantKB.length > 0 ? relevantKB[0].entry_id : null;
+
+      // Update times_used for KB entries that were referenced
+      if (relevantKB.length > 0) {
+        for (const kb of relevantKB) {
+          await supabase
+            .from("rfp_knowledge_base")
+            .update({ times_used: (kb.times_used || 0) + 1 })
+            .eq("entry_id", kb.entry_id);
+        }
+      }
+
+      const { error: insertError } = await supabase
+        .from("rfp_responses")
+        .insert({
+          requirement_id: requirement.requirement_id,
+          project_id: projectId,
+          draft_text: draftText,
+          status: "draft",
+          ai_confidence: relevantKB.length > 0 ? 0.8 : 0.6,
+          kb_source_id: kbSourceId,
+        });
+
+      if (insertError) {
+        console.error(`Failed to insert response for ${requirement.requirement_id}:`, insertError);
+      }
+    } catch (genErr) {
+      console.error(`Failed to generate response for ${requirement.requirement_id}:`, genErr);
+    }
   }
 }

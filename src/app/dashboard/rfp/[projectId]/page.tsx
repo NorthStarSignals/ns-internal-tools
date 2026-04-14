@@ -85,9 +85,12 @@ export default function ProjectDetailPage() {
       );
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setRequirements(data.requirements || []);
+      const reqs = data.requirements || [];
+      setRequirements(reqs);
+      return reqs;
     } catch {
       toast.error("Failed to load requirements");
+      return [];
     }
   }, [projectId]);
 
@@ -159,11 +162,21 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ document_id: documentId }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Extracting requirements...");
+      toast.success("Extracting requirements — this may take 30-60 seconds...");
+      // Poll for results since extraction happens in background
+      const pollInterval = setInterval(async () => {
+        const reqs = await fetchRequirements();
+        if (reqs && reqs.length > 0) {
+          clearInterval(pollInterval);
+          setExtractingDocId(null);
+          toast.success("Requirements extracted successfully!");
+        }
+      }, 5000);
+      // Stop polling after 90 seconds
       setTimeout(() => {
-        fetchRequirements();
+        clearInterval(pollInterval);
         setExtractingDocId(null);
-      }, 3000);
+      }, 90000);
     } catch {
       toast.error("Failed to extract requirements");
       setExtractingDocId(null);

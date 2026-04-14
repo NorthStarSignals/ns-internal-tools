@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { LEGAL_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
+import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 60;
 
@@ -73,48 +74,53 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const allExtracts = [];
+    // Process in background
+    waitUntil(processLegalExtraction(supabase, deal_id, files));
 
-    // Process files sequentially to avoid rate limits
-    for (const file of files) {
-      try {
-        const result = await askClaudeJSON<LegalExtractionResult>(
-          LEGAL_EXTRACTION_PROMPT,
-          `File: ${file.file_name} (${file.document_category})\n\n${file.extracted_text}`,
-          { maxTokens: 8192 }
-        );
-
-        const { data: extract, error: insertError } = await supabase
-          .from("legal_extracts")
-          .insert({
-            deal_id,
-            file_id: file.file_id,
-            document_type: result.document_type,
-            counterparty: result.counterparty,
-            effective_date: result.effective_date,
-            expiration_date: result.expiration_date,
-            key_terms: result.key_terms,
-            change_of_control_clause: result.change_of_control_clause,
-            termination_provisions: result.termination_provisions,
-            unusual_provisions: result.unusual_provisions,
-            risk_level: result.risk_level,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error(`Insert failed for ${file.file_name}:`, insertError);
-        } else {
-          allExtracts.push(extract);
-        }
-      } catch (extractErr) {
-        console.error(`Legal extraction failed for ${file.file_name}:`, extractErr);
-      }
-    }
-
-    return NextResponse.json({ extracts: allExtracts });
+    return NextResponse.json(
+      { message: "Legal extraction started", status: "processing", file_count: files.length },
+      { status: 202 }
+    );
   } catch (err) {
     console.error("POST /api/deals/extract/legal error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function processLegalExtraction(
+  supabase: ReturnType<typeof createServerSupabase>,
+  dealId: string,
+  files: Array<Record<string, unknown>>
+) {
+  for (const file of files) {
+    try {
+      const result = await askClaudeJSON<LegalExtractionResult>(
+        LEGAL_EXTRACTION_PROMPT,
+        `File: ${file.file_name} (${file.document_category})\n\n${file.extracted_text}`,
+        { maxTokens: 8192 }
+      );
+
+      const { error: insertError } = await supabase
+        .from("legal_extracts")
+        .insert({
+          deal_id: dealId,
+          file_id: file.file_id,
+          document_type: result.document_type,
+          counterparty: result.counterparty,
+          effective_date: result.effective_date,
+          expiration_date: result.expiration_date,
+          key_terms: result.key_terms,
+          change_of_control_clause: result.change_of_control_clause,
+          termination_provisions: result.termination_provisions,
+          unusual_provisions: result.unusual_provisions,
+          risk_level: result.risk_level,
+        });
+
+      if (insertError) {
+        console.error(`Insert failed for ${file.file_name}:`, insertError);
+      }
+    } catch (extractErr) {
+      console.error(`Legal extraction failed for ${file.file_name}:`, extractErr);
+    }
   }
 }

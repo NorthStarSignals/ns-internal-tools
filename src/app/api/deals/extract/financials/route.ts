@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { FINANCIAL_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
+import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 60;
 
@@ -70,52 +71,57 @@ export async function POST(request: NextRequest) {
     // Update deal status to processing
     await supabase.from("deals").update({ status: "processing", updated_at: new Date().toISOString() }).eq("deal_id", deal_id);
 
-    const allExtracts = [];
+    // Process in background
+    waitUntil(processFinancialExtraction(supabase, deal_id, files));
 
-    // Process files sequentially to avoid rate limits
-    for (const file of files) {
-      try {
-        const periods = await askClaudeJSON<FinancialPeriod[]>(
-          FINANCIAL_EXTRACTION_PROMPT,
-          `File: ${file.file_name} (${file.document_category})\n\n${file.extracted_text}`,
-          { maxTokens: 8192 }
-        );
-
-        const periodsArray = Array.isArray(periods) ? periods : [periods];
-
-        for (const period of periodsArray) {
-          const { data: extract, error: insertError } = await supabase
-            .from("financial_extracts")
-            .insert({
-              deal_id,
-              file_id: file.file_id,
-              period: period.period,
-              revenue: period.revenue,
-              cogs: period.cogs,
-              gross_margin: period.gross_margin,
-              operating_expenses: period.operating_expenses,
-              net_income: period.net_income,
-              ebitda: period.ebitda,
-              cash_balance: period.cash_balance,
-              debt_outstanding: period.debt_outstanding,
-            })
-            .select()
-            .single();
-
-          if (insertError) {
-            console.error(`Insert failed for period ${period.period}:`, insertError);
-          } else {
-            allExtracts.push(extract);
-          }
-        }
-      } catch (extractErr) {
-        console.error(`Financial extraction failed for ${file.file_name}:`, extractErr);
-      }
-    }
-
-    return NextResponse.json({ extracts: allExtracts });
+    return NextResponse.json(
+      { message: "Financial extraction started", status: "processing", file_count: files.length },
+      { status: 202 }
+    );
   } catch (err) {
     console.error("POST /api/deals/extract/financials error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function processFinancialExtraction(
+  supabase: ReturnType<typeof createServerSupabase>,
+  dealId: string,
+  files: Array<Record<string, unknown>>
+) {
+  for (const file of files) {
+    try {
+      const periods = await askClaudeJSON<FinancialPeriod[]>(
+        FINANCIAL_EXTRACTION_PROMPT,
+        `File: ${file.file_name} (${file.document_category})\n\n${file.extracted_text}`,
+        { maxTokens: 8192 }
+      );
+
+      const periodsArray = Array.isArray(periods) ? periods : [periods];
+
+      for (const period of periodsArray) {
+        const { error: insertError } = await supabase
+          .from("financial_extracts")
+          .insert({
+            deal_id: dealId,
+            file_id: file.file_id,
+            period: period.period,
+            revenue: period.revenue,
+            cogs: period.cogs,
+            gross_margin: period.gross_margin,
+            operating_expenses: period.operating_expenses,
+            net_income: period.net_income,
+            ebitda: period.ebitda,
+            cash_balance: period.cash_balance,
+            debt_outstanding: period.debt_outstanding,
+          });
+
+        if (insertError) {
+          console.error(`Insert failed for period ${period.period}:`, insertError);
+        }
+      }
+    } catch (extractErr) {
+      console.error(`Financial extraction failed for ${file.file_name}:`, extractErr);
+    }
   }
 }

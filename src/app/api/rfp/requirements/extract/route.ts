@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { REQUIREMENT_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
+import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 60;
 
@@ -67,6 +68,28 @@ export async function POST(request: NextRequest) {
           .join("\n\n")
       : String(doc.extracted_text);
 
+    // Use waitUntil to process in background after returning 202
+    waitUntil(
+      processExtraction(supabase, doc.project_id, document_id, fullText)
+    );
+
+    return NextResponse.json(
+      { message: "Extraction started", status: "processing" },
+      { status: 202 }
+    );
+  } catch (err) {
+    console.error("POST /api/rfp/requirements/extract error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+async function processExtraction(
+  supabase: ReturnType<typeof createServerSupabase>,
+  projectId: string,
+  documentId: string,
+  fullText: string
+) {
+  try {
     // Send to Claude for extraction
     const extracted = await askClaudeJSON<ExtractedRequirement[]>(
       REQUIREMENT_EXTRACTION_PROMPT,
@@ -75,17 +98,15 @@ export async function POST(request: NextRequest) {
     );
 
     if (!Array.isArray(extracted) || extracted.length === 0) {
-      return NextResponse.json(
-        { error: "No requirements could be extracted" },
-        { status: 422 }
-      );
+      console.error("No requirements extracted from document:", documentId);
+      return;
     }
 
     // Get current max sort_order
     const { data: maxSort } = await supabase
       .from("rfp_requirements")
       .select("sort_order")
-      .eq("project_id", doc.project_id)
+      .eq("project_id", projectId)
       .order("sort_order", { ascending: false })
       .limit(1)
       .single();
@@ -94,8 +115,8 @@ export async function POST(request: NextRequest) {
 
     // Insert all extracted requirements
     const rows = extracted.map((req) => ({
-      project_id: doc.project_id,
-      document_id: document_id,
+      project_id: projectId,
+      document_id: documentId,
       section: req.section || null,
       requirement_text: req.requirement_text,
       requirement_type: req.requirement_type || "narrative",
@@ -104,21 +125,16 @@ export async function POST(request: NextRequest) {
       sort_order: nextOrder++,
     }));
 
-    const { data: inserted, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from("rfp_requirements")
-      .insert(rows)
-      .select();
+      .insert(rows);
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      console.error("Failed to insert extracted requirements:", insertError);
+    } else {
+      console.log(`Successfully extracted ${rows.length} requirements from document ${documentId}`);
     }
-
-    return NextResponse.json({
-      extracted_count: inserted?.length || 0,
-      requirements: inserted,
-    });
   } catch (err) {
-    console.error("POST /api/rfp/requirements/extract error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Background extraction failed for document:", documentId, err);
   }
 }
