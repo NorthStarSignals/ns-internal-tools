@@ -105,7 +105,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ classified: results });
+    // Re-fetch all files for the deal so frontend gets full updated records
+    const { data: updatedFiles } = await supabase
+      .from("data_room_files")
+      .select("*")
+      .eq("deal_id", deal_id)
+      .order("created_at", { ascending: false });
+
+    return NextResponse.json({ files: updatedFiles || [], classified: results });
   } catch (err) {
     console.error("POST /api/deals/files/classify error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

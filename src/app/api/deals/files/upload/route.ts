@@ -93,11 +93,11 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         results.push({ fileName, error: insertError.message });
       } else {
-        results.push({ fileName, file_id: fileRecord.file_id, status: "uploaded" });
+        results.push(fileRecord);
       }
     }
 
-    return NextResponse.json({ uploaded: results });
+    return NextResponse.json({ files: results.filter((r) => r.file_id) });
   } catch (err) {
     console.error("POST /api/deals/files/upload error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

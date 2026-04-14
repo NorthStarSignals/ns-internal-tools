@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ responses: data });
   } catch (err) {
     console.error("GET /api/rfp/responses error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -109,7 +109,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ response: data });
   } catch (err) {
     console.error("PATCH /api/rfp/responses error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
