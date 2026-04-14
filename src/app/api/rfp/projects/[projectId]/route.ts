@@ -45,10 +45,12 @@ export async function GET(
       ]);
 
     return NextResponse.json({
-      ...data,
-      requirement_count: requirement_count || 0,
-      response_count: response_count || 0,
-      approved_count: approved_count || 0,
+      project: {
+        ...data,
+        requirement_count: requirement_count || 0,
+        response_count: response_count || 0,
+        approved_count: approved_count || 0,
+      },
     });
   } catch (err) {
     console.error("GET /api/rfp/projects/[projectId] error:", err);

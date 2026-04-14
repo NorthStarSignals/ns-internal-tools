@@ -37,20 +37,30 @@ export async function GET(
     const files = filesRes.data || [];
     const flags = flagsRes.data || [];
 
+    // Fetch full file details for the data room tab
+    const { data: fullFiles } = await supabase
+      .from("data_room_files")
+      .select("*")
+      .eq("deal_id", dealId)
+      .order("created_at", { ascending: false });
+
     return NextResponse.json({
-      ...deal,
-      file_count: files.length,
-      files_completed: files.filter((f) => f.processing_status === "completed").length,
-      files_by_category: files.reduce((acc: Record<string, number>, f) => {
-        const cat = f.document_category || "unclassified";
-        acc[cat] = (acc[cat] || 0) + 1;
-        return acc;
-      }, {}),
-      critical_count: flags.filter((f) => f.severity === "critical").length,
-      warning_count: flags.filter((f) => f.severity === "warning").length,
-      note_count: flags.filter((f) => f.severity === "note").length,
-      financial_extract_count: (financialsRes.data || []).length,
-      legal_extract_count: (legalsRes.data || []).length,
+      deal: {
+        ...deal,
+        file_count: files.length,
+        files_completed: files.filter((f) => f.processing_status === "completed").length,
+        files_by_category: files.reduce((acc: Record<string, number>, f) => {
+          const cat = f.document_category || "unclassified";
+          acc[cat] = (acc[cat] || 0) + 1;
+          return acc;
+        }, {}),
+        critical_count: flags.filter((f) => f.severity === "critical").length,
+        warning_count: flags.filter((f) => f.severity === "warning").length,
+        note_count: flags.filter((f) => f.severity === "note").length,
+        financial_extract_count: (financialsRes.data || []).length,
+        legal_extract_count: (legalsRes.data || []).length,
+      },
+      files: fullFiles || [],
     });
   } catch (err) {
     console.error("GET /api/deals/[dealId] error:", err);

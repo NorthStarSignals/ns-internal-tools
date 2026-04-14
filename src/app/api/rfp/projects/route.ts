@@ -25,7 +25,7 @@ export async function GET() {
     const projectIds = projects.map((p: { project_id: string }) => p.project_id);
 
     if (projectIds.length === 0) {
-      return NextResponse.json(projects);
+      return NextResponse.json({ projects });
     }
 
     const { data: reqCounts } = await supabase
@@ -59,7 +59,7 @@ export async function GET() {
       approved_count: approvedCountMap[p.project_id] || 0,
     }));
 
-    return NextResponse.json(enriched);
+    return NextResponse.json({ projects: enriched });
   } catch (err) {
     console.error("GET /api/rfp/projects error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({ project: data }, { status: 201 });
   } catch (err) {
     console.error("POST /api/rfp/projects error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

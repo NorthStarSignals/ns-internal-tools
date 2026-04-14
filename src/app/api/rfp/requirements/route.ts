@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ requirements: data });
   } catch (err) {
     console.error("GET /api/rfp/requirements error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

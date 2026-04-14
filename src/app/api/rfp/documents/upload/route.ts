@@ -83,10 +83,12 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         {
-          ...doc,
-          extracted_text: extraction.pages,
-          page_count: extraction.pageCount,
-          processing_status: "completed",
+          document: {
+            ...doc,
+            extracted_text: extraction.pages,
+            page_count: extraction.pageCount,
+            processing_status: "completed",
+          },
         },
         { status: 201 }
       );
@@ -99,7 +101,7 @@ export async function POST(request: NextRequest) {
         .eq("document_id", doc.document_id);
 
       return NextResponse.json(
-        { ...doc, processing_status: "failed" },
+        { document: { ...doc, processing_status: "failed" } },
         { status: 201 }
       );
     }

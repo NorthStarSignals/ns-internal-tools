@@ -108,7 +108,7 @@ export default function DealDetailPage() {
 
   const fetchDeal = useCallback(async () => {
     try {
-      const res = await fetch(`/api/deals?deal_id=${dealId}`);
+      const res = await fetch(`/api/deals/${dealId}`);
       if (!res.ok) throw new Error("Failed to fetch deal");
       const data = await res.json();
       setDeal(data.deal || null);

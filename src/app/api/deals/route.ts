@@ -56,7 +56,7 @@ export async function GET() {
       note_count: flagCountMap[deal.deal_id]?.note || 0,
     }));
 
-    return NextResponse.json(enrichedDeals);
+    return NextResponse.json({ deals: enrichedDeals });
   } catch (err) {
     console.error("GET /api/deals error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({ deal: data }, { status: 201 });
   } catch (err) {
     console.error("POST /api/deals error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

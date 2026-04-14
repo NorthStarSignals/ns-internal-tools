@@ -21,7 +21,7 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ profiles: data });
   } catch (err) {
     console.error("GET /api/rfp/profiles error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({ profile: data }, { status: 201 });
   } catch (err) {
     console.error("POST /api/rfp/profiles error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

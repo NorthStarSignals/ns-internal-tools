@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         (severityOrder[b.severity as keyof typeof severityOrder] ?? 3)
     );
 
-    return NextResponse.json(sorted);
+    return NextResponse.json({ flags: sorted });
   } catch (err) {
     console.error("GET /api/deals/red-flags error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -9,38 +9,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const dealId = request.nextUrl.searchParams.get("deal_id");
-    if (!dealId) {
-      return NextResponse.json({ error: "deal_id query param is required" }, { status: 400 });
+    const projectId = request.nextUrl.searchParams.get("project_id");
+    if (!projectId) {
+      return NextResponse.json({ error: "project_id is required" }, { status: 400 });
     }
 
     const supabase = createServerSupabase();
 
-    // Verify deal ownership
-    const { data: deal } = await supabase
-      .from("deals")
-      .select("deal_id")
-      .eq("deal_id", dealId)
+    // Verify project ownership
+    const { data: project } = await supabase
+      .from("rfp_projects")
+      .select("project_id")
+      .eq("project_id", projectId)
       .eq("clerk_user_id", userId)
       .single();
 
-    if (!deal) {
-      return NextResponse.json({ error: "Deal not found" }, { status: 404 });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     const { data, error } = await supabase
-      .from("financial_extracts")
+      .from("rfp_documents")
       .select("*")
-      .eq("deal_id", dealId)
-      .order("period", { ascending: true });
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ extracts: data });
+    return NextResponse.json({ documents: data });
   } catch (err) {
-    console.error("GET /api/deals/financials error:", err);
+    console.error("GET /api/rfp/documents error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
