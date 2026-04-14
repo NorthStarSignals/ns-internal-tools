@@ -4,6 +4,8 @@ import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { LEGAL_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
 
+export const maxDuration = 60;
+
 interface LegalExtractionResult {
   document_type: string | null;
   counterparty: string | null;

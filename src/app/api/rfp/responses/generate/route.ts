@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaude } from "@/lib/claude";
 import { RESPONSE_GENERATION_PROMPT } from "@/lib/claude-prompts";
+
+export const maxDuration = 60;
 import { RfpRequirement, CompanyProfile, KnowledgeBaseEntry } from "@/lib/types";
 
 function getRelevantKBEntries(

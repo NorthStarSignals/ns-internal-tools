@@ -4,6 +4,8 @@ import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { RED_FLAG_ANALYSIS_PROMPT } from "@/lib/claude-prompts";
 
+export const maxDuration = 60;
+
 interface RedFlagResult {
   severity: "critical" | "warning" | "note";
   category: "financial" | "legal" | "operational" | "concentration";

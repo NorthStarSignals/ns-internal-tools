@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "src/app/api/rfp/requirements/extract/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/rfp/responses/generate/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/deals/analyze/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/deals/extract/*/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/deals/files/classify/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

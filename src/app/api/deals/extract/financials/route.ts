@@ -4,6 +4,8 @@ import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { FINANCIAL_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
 
+export const maxDuration = 60;
+
 interface FinancialPeriod {
   period: string;
   revenue: number | null;

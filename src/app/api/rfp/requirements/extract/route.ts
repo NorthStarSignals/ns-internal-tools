@@ -4,6 +4,8 @@ import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { REQUIREMENT_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
 
+export const maxDuration = 60;
+
 interface ExtractedRequirement {
   section: string | null;
   requirement_text: string;
