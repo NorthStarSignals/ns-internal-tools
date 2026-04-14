@@ -559,7 +559,7 @@ function AdminDashboard() {
     (s, e) => s + (e.hours || 0),
     0
   );
-  const activeContractors = users.filter(
+  const activeMembers = users.filter(
     (u) => u.status === "active" && u.role === "member"
   ).length;
   const pendingApprovals = entries.filter(
@@ -591,7 +591,7 @@ function AdminDashboard() {
     .sort((a, b) => b.hours - a.hours)
     .slice(0, 10);
 
-  // Hours by contractor
+  // Hours by team member
   const hoursByUser: Record<string, { name: string; hours: number }> = {};
   entries.forEach((e) => {
     const uName = e.tt_users?.name || "Unknown";
@@ -622,7 +622,7 @@ function AdminDashboard() {
           <Link href="/dashboard/time-tracker/contractors">
             <Button variant="secondary" size="sm">
               <Users size={16} />
-              Contractors
+              Team
             </Button>
           </Link>
           <Link href="/dashboard/time-tracker/projects">
@@ -663,9 +663,9 @@ function AdminDashboard() {
         <div className="bg-navy-800 border border-navy-700 rounded-xl p-6">
           <div className="flex items-center gap-2 text-slate-400 mb-2">
             <Users size={16} />
-            <span className="text-sm">Active Contractors</span>
+            <span className="text-sm">Active Members</span>
           </div>
-          <p className="text-2xl font-bold text-white">{activeContractors}</p>
+          <p className="text-2xl font-bold text-white">{activeMembers}</p>
         </div>
         <div className="bg-navy-800 border border-navy-700 rounded-xl p-6">
           <div className="flex items-center gap-2 text-slate-400 mb-2">
@@ -743,10 +743,10 @@ function AdminDashboard() {
           )}
         </div>
 
-        {/* Hours by Contractor */}
+        {/* Hours by Team Member */}
         <div className="bg-navy-800 border border-navy-700 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-white mb-4">
-            Hours by Contractor
+            Hours by Team Member
           </h3>
           {userChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>

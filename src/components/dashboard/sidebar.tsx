@@ -41,7 +41,7 @@ const timeTrackerLinks = [
   { href: "/dashboard/time-tracker/my-hours", label: "My Hours", icon: ClipboardList },
   { href: "/dashboard/time-tracker/my-pay", label: "My Pay", icon: DollarSign },
   { href: "/dashboard/time-tracker/entries", label: "All Entries", icon: ClipboardList, adminOnly: true },
-  { href: "/dashboard/time-tracker/contractors", label: "Contractors", icon: Users, adminOnly: true },
+  { href: "/dashboard/time-tracker/contractors", label: "Team", icon: Users, adminOnly: true },
   { href: "/dashboard/time-tracker/projects", label: "Projects", icon: FolderOpen, adminOnly: true },
   { href: "/dashboard/time-tracker/pay-reports", label: "Pay Reports", icon: Receipt, adminOnly: true },
 ];

@@ -77,7 +77,7 @@ export default function ContractorsPage() {
       if (usersRes.ok) setUsers(await usersRes.json());
       if (entriesRes.ok) setEntries(await entriesRes.json());
     } catch {
-      toast.error("Failed to load contractors");
+      toast.error("Failed to load team members");
     } finally {
       setLoading(false);
     }
@@ -148,7 +148,7 @@ export default function ContractorsPage() {
       });
 
       if (res.ok) {
-        toast.success(editUser ? "Contractor updated" : "Contractor added");
+        toast.success(editUser ? "Team member updated" : "Team member added");
         setShowModal(false);
         fetchData();
       } else {
@@ -156,7 +156,7 @@ export default function ContractorsPage() {
         toast.error(err.error || "Failed to save");
       }
     } catch {
-      toast.error("Failed to save contractor");
+      toast.error("Failed to save team member");
     } finally {
       setSaving(false);
     }
@@ -171,7 +171,7 @@ export default function ContractorsPage() {
         { method: "DELETE" }
       );
       if (res.ok) {
-        toast.success("Contractor deactivated");
+        toast.success("Team member deactivated");
         setDeactivateUser(null);
         fetchData();
       } else {
@@ -196,7 +196,7 @@ export default function ContractorsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Contractors</h1>
+            <h1 className="text-2xl font-bold text-white">Team</h1>
             <p className="text-slate-400 mt-1">
               Manage team members and pay rates
             </p>
@@ -207,7 +207,7 @@ export default function ContractorsPage() {
           onClick={openAdd}
         >
           <Plus size={16} />
-          Add Contractor
+          Add Member
         </Button>
       </div>
 
@@ -219,7 +219,7 @@ export default function ContractorsPage() {
           </div>
         ) : users.length === 0 ? (
           <div className="text-center py-16 text-slate-500">
-            No contractors found
+            No team members found
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -324,7 +324,7 @@ export default function ContractorsPage() {
       <Modal
         open={showModal}
         onClose={() => setShowModal(false)}
-        title={editUser ? "Edit Contractor" : "Add Contractor"}
+        title={editUser ? "Edit Team Member" : "Add Team Member"}
       >
         <div className="space-y-4">
           <Input
@@ -382,7 +382,7 @@ export default function ContractorsPage() {
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 size={16} className="animate-spin" />}
-              {editUser ? "Save Changes" : "Add Contractor"}
+              {editUser ? "Save Changes" : "Add Member"}
             </Button>
           </div>
         </div>
@@ -392,7 +392,7 @@ export default function ContractorsPage() {
       <Modal
         open={!!deactivateUser}
         onClose={() => setDeactivateUser(null)}
-        title="Deactivate Contractor"
+        title="Deactivate Team Member"
       >
         <div className="space-y-4">
           <p className="text-slate-300">

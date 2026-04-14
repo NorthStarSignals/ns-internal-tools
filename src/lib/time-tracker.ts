@@ -43,17 +43,43 @@ export async function getTTUserOrLink(clerkUserId: string) {
     .is("clerk_user_id", null)
     .single();
 
-  if (!matchedUser) return null;
+  if (matchedUser) {
+    // Link the Clerk user to the tt_users record
+    const { data: linkedUser } = await supabase
+      .from("tt_users")
+      .update({ clerk_user_id: clerkUserId })
+      .eq("id", matchedUser.id)
+      .select("*")
+      .single();
 
-  // Link the Clerk user to the tt_users record
-  const { data: linkedUser } = await supabase
+    return linkedUser || matchedUser;
+  }
+
+  // No record at all — auto-create one
+  // Check if any users exist; if not, make this user admin
+  const { count } = await supabase
     .from("tt_users")
-    .update({ clerk_user_id: clerkUserId })
-    .eq("id", matchedUser.id)
+    .select("*", { count: "exact", head: true });
+
+  const isFirstUser = (count ?? 0) === 0;
+  const fullName =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+    email.split("@")[0];
+
+  const { data: newUser } = await supabase
+    .from("tt_users")
+    .insert({
+      name: fullName,
+      email,
+      role: isFirstUser ? "admin" : "member",
+      pay_type: "hourly",
+      status: "active",
+      clerk_user_id: clerkUserId,
+    })
     .select("*")
     .single();
 
-  return linkedUser || matchedUser;
+  return newUser;
 }
 
 export async function requireAdmin(clerkUserId: string) {

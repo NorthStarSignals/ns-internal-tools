@@ -278,7 +278,7 @@ export default function EntriesPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">All Time Entries</h1>
             <p className="text-slate-400 mt-1">
-              Review and approve contractor timesheets
+              Review and approve team timesheets
             </p>
           </div>
         </div>
@@ -333,14 +333,14 @@ export default function EntriesPage() {
           />
           <div className="space-y-1">
             <label className="block text-sm font-medium text-slate-300">
-              Contractor
+              Team Member
             </label>
             <select
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
               className="w-full px-3 py-2 bg-navy-900 border border-navy-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50"
             >
-              <option value="">All Contractors</option>
+              <option value="">All Members</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
@@ -414,7 +414,7 @@ export default function EntriesPage() {
                     onClick={() => toggleSort("user")}
                   >
                     <span className="inline-flex items-center gap-1">
-                      Contractor <SortIcon col="user" />
+                      Member <SortIcon col="user" />
                     </span>
                   </th>
                   <th
@@ -503,7 +503,7 @@ export default function EntriesPage() {
         <div className="space-y-4">
           <p className="text-slate-300">
             Reject {selectedSubmitted.length} submitted entries? They will be
-            sent back to draft status for the contractors to edit.
+            sent back to draft status for the team to edit.
           </p>
           <div className="space-y-1">
             <label className="block text-sm font-medium text-slate-300">

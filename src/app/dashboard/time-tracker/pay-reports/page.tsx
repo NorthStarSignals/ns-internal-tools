@@ -88,7 +88,7 @@ export default function PayReportsPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Pay Reports</h1>
             <p className="text-slate-400 mt-1">
-              Contractor pay summary and CSV export
+              Team pay summary and CSV export
             </p>
           </div>
         </div>
@@ -139,7 +139,7 @@ export default function PayReportsPage() {
               <thead>
                 <tr className="border-b border-navy-700">
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">
-                    Contractor
+                    Name
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">
                     Pay Type
