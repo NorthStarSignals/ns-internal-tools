@@ -12,11 +12,11 @@ export function getClaudeClient(): Anthropic {
 export async function askClaude(
   systemPrompt: string,
   userMessage: string,
-  options?: { maxTokens?: number; temperature?: number }
+  options?: { maxTokens?: number; temperature?: number; model?: string }
 ): Promise<string> {
   const claude = getClaudeClient();
   const response = await claude.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: options?.model || "claude-sonnet-4-20250514",
     max_tokens: options?.maxTokens ?? 4096,
     temperature: options?.temperature ?? 0,
     system: systemPrompt,
@@ -31,7 +31,7 @@ export async function askClaude(
 export async function askClaudeJSON<T>(
   systemPrompt: string,
   userMessage: string,
-  options?: { maxTokens?: number }
+  options?: { maxTokens?: number; model?: string }
 ): Promise<T> {
   const text = await askClaude(
     systemPrompt + "\n\nRespond with valid JSON only. No markdown, no code fences.",

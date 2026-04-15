@@ -3,7 +3,6 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { REQUIREMENT_EXTRACTION_PROMPT } from "@/lib/claude-prompts";
-import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 60;
 
@@ -61,35 +60,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build the full text from pages
-    const fullText = Array.isArray(doc.extracted_text)
-      ? doc.extracted_text
-          .map((p: { page: number; text: string }) => `--- Page ${p.page} ---\n${p.text}`)
-          .join("\n\n")
-      : String(doc.extracted_text);
+    // Build the full text from pages — truncate to avoid huge payloads
+    let fullText: string;
+    if (Array.isArray(doc.extracted_text)) {
+      fullText = doc.extracted_text
+        .map((p: { page: number; text: string }) => `--- Page ${p.page} ---\n${p.text}`)
+        .join("\n\n");
+    } else {
+      fullText = String(doc.extracted_text);
+    }
 
-    // Use waitUntil to process in background after returning 202
-    waitUntil(
-      processExtraction(supabase, doc.project_id, document_id, fullText)
-    );
+    // Truncate to ~30k chars to keep within reasonable limits for fast response
+    if (fullText.length > 30000) {
+      fullText = fullText.substring(0, 30000) + "\n\n[Document truncated for processing]";
+    }
 
-    return NextResponse.json(
-      { message: "Extraction started", status: "processing" },
-      { status: 202 }
-    );
-  } catch (err) {
-    console.error("POST /api/rfp/requirements/extract error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-async function processExtraction(
-  supabase: ReturnType<typeof createServerSupabase>,
-  projectId: string,
-  documentId: string,
-  fullText: string
-) {
-  try {
     // Send to Claude for extraction
     const extracted = await askClaudeJSON<ExtractedRequirement[]>(
       REQUIREMENT_EXTRACTION_PROMPT,
@@ -98,15 +83,17 @@ async function processExtraction(
     );
 
     if (!Array.isArray(extracted) || extracted.length === 0) {
-      console.error("No requirements extracted from document:", documentId);
-      return;
+      return NextResponse.json(
+        { error: "No requirements could be extracted" },
+        { status: 422 }
+      );
     }
 
     // Get current max sort_order
     const { data: maxSort } = await supabase
       .from("rfp_requirements")
       .select("sort_order")
-      .eq("project_id", projectId)
+      .eq("project_id", doc.project_id)
       .order("sort_order", { ascending: false })
       .limit(1)
       .single();
@@ -115,8 +102,8 @@ async function processExtraction(
 
     // Insert all extracted requirements
     const rows = extracted.map((req) => ({
-      project_id: projectId,
-      document_id: documentId,
+      project_id: doc.project_id,
+      document_id: document_id,
       section: req.section || null,
       requirement_text: req.requirement_text,
       requirement_type: req.requirement_type || "narrative",
@@ -125,16 +112,24 @@ async function processExtraction(
       sort_order: nextOrder++,
     }));
 
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from("rfp_requirements")
-      .insert(rows);
+      .insert(rows)
+      .select();
 
     if (insertError) {
-      console.error("Failed to insert extracted requirements:", insertError);
-    } else {
-      console.log(`Successfully extracted ${rows.length} requirements from document ${documentId}`);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
+
+    return NextResponse.json({
+      extracted_count: inserted?.length || 0,
+      requirements: inserted,
+    });
   } catch (err) {
-    console.error("Background extraction failed for document:", documentId, err);
+    console.error("POST /api/rfp/requirements/extract error:", err);
+    return NextResponse.json({
+      error: "Internal server error",
+      detail: err instanceof Error ? err.message : String(err),
+    }, { status: 500 });
   }
 }

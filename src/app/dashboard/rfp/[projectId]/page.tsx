@@ -155,15 +155,25 @@ export default function ProjectDetailPage() {
 
   async function handleExtractRequirements(documentId: string) {
     setExtractingDocId(documentId);
+    toast.success("Extracting requirements — this may take 30-60 seconds...");
     try {
       const res = await fetch("/api/rfp/requirements/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ document_id: documentId }),
       });
-      if (!res.ok) throw new Error();
-      toast.success("Extracting requirements — this may take 30-60 seconds...");
-      // Poll for results since extraction happens in background
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.detail || "Extraction failed");
+      }
+      // If sync response with requirements
+      if (data.requirements && data.requirements.length > 0) {
+        await fetchRequirements();
+        setExtractingDocId(null);
+        toast.success(`Extracted ${data.extracted_count} requirements!`);
+        return;
+      }
+      // If 202 async response, poll
       const pollInterval = setInterval(async () => {
         const reqs = await fetchRequirements();
         if (reqs && reqs.length > 0) {
@@ -172,13 +182,12 @@ export default function ProjectDetailPage() {
           toast.success("Requirements extracted successfully!");
         }
       }, 5000);
-      // Stop polling after 90 seconds
       setTimeout(() => {
         clearInterval(pollInterval);
         setExtractingDocId(null);
       }, 90000);
-    } catch {
-      toast.error("Failed to extract requirements");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to extract requirements");
       setExtractingDocId(null);
     }
   }
