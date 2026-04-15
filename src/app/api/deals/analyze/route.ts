@@ -3,7 +3,6 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { askClaudeJSON } from "@/lib/claude";
 import { RED_FLAG_ANALYSIS_PROMPT } from "@/lib/claude-prompts";
-import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 60;
 
@@ -75,25 +74,6 @@ LEGAL/CONTRACT DATA (${legals.length} documents):
 ${JSON.stringify(legals, null, 2)}
 `;
 
-    // Process in background
-    waitUntil(processRedFlagAnalysis(supabase, deal_id, context));
-
-    return NextResponse.json(
-      { message: "Red flag analysis started", status: "processing" },
-      { status: 202 }
-    );
-  } catch (err) {
-    console.error("POST /api/deals/analyze error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-async function processRedFlagAnalysis(
-  supabase: ReturnType<typeof createServerSupabase>,
-  dealId: string,
-  context: string
-) {
-  try {
     const redFlags = await askClaudeJSON<RedFlagResult[]>(
       RED_FLAG_ANALYSIS_PROMPT,
       context,
@@ -103,13 +83,15 @@ async function processRedFlagAnalysis(
     const flagsArray = Array.isArray(redFlags) ? redFlags : [redFlags];
 
     // Delete existing red flags for this deal before inserting new ones
-    await supabase.from("red_flags").delete().eq("deal_id", dealId);
+    await supabase.from("red_flags").delete().eq("deal_id", deal_id);
+
+    const insertedFlags = [];
 
     for (const flag of flagsArray) {
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("red_flags")
         .insert({
-          deal_id: dealId,
+          deal_id,
           severity: flag.severity,
           category: flag.category,
           title: flag.title,
@@ -117,10 +99,14 @@ async function processRedFlagAnalysis(
           source_reference: flag.source_reference,
           recommendation: flag.recommendation,
           is_dismissed: false,
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) {
         console.error("Failed to insert red flag:", insertError);
+      } else {
+        insertedFlags.push(inserted);
       }
     }
 
@@ -128,8 +114,22 @@ async function processRedFlagAnalysis(
     await supabase
       .from("deals")
       .update({ status: "review", updated_at: new Date().toISOString() })
-      .eq("deal_id", dealId);
+      .eq("deal_id", deal_id);
+
+    return NextResponse.json({
+      red_flags: insertedFlags,
+      summary: {
+        total: insertedFlags.length,
+        critical: insertedFlags.filter((f) => f.severity === "critical").length,
+        warning: insertedFlags.filter((f) => f.severity === "warning").length,
+        note: insertedFlags.filter((f) => f.severity === "note").length,
+      },
+    });
   } catch (err) {
-    console.error("Background red flag analysis failed:", err);
+    console.error("POST /api/deals/analyze error:", err);
+    return NextResponse.json({
+      error: "Internal server error",
+      detail: err instanceof Error ? err.message : String(err),
+    }, { status: 500 });
   }
 }
