@@ -101,16 +101,36 @@ export async function POST(request: NextRequest) {
     let nextOrder = (maxSort?.sort_order ?? -1) + 1;
 
     // Insert all extracted requirements
-    const rows = extracted.map((req) => ({
-      project_id: doc.project_id,
-      document_id: document_id,
-      section: req.section || null,
-      requirement_text: req.requirement_text,
-      requirement_type: req.requirement_type || "narrative",
-      word_limit: req.word_limit || null,
-      page_number: req.page_number || null,
-      sort_order: nextOrder++,
-    }));
+    const rows = extracted.map((req) => {
+      // Sanitize word_limit — Claude sometimes returns strings like "maximum 3 pages"
+      let wordLimit: number | null = null;
+      if (req.word_limit !== null && req.word_limit !== undefined) {
+        const parsed = typeof req.word_limit === "number"
+          ? req.word_limit
+          : parseInt(String(req.word_limit).replace(/[^\d]/g, ""), 10);
+        wordLimit = isNaN(parsed) ? null : parsed;
+      }
+
+      // Sanitize page_number similarly
+      let pageNumber: number | null = null;
+      if (req.page_number !== null && req.page_number !== undefined) {
+        const parsed = typeof req.page_number === "number"
+          ? req.page_number
+          : parseInt(String(req.page_number), 10);
+        pageNumber = isNaN(parsed) ? null : parsed;
+      }
+
+      return {
+        project_id: doc.project_id,
+        document_id: document_id,
+        section: req.section || null,
+        requirement_text: req.requirement_text,
+        requirement_type: req.requirement_type || "narrative",
+        word_limit: wordLimit,
+        page_number: pageNumber,
+        sort_order: nextOrder++,
+      };
+    });
 
     const { data: inserted, error: insertError } = await supabase
       .from("rfp_requirements")
