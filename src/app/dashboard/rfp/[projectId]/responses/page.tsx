@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,10 +11,10 @@ import {
   Trophy,
   Loader2,
   Save,
+  Square,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { truncate } from "@/lib/utils";
 import {
@@ -33,11 +33,13 @@ export default function ResponsesPage() {
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [generatingAll, setGeneratingAll] = useState(false);
+  const [generatingProgress, setGeneratingProgress] = useState({ done: 0, total: 0 });
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const cancelRef = useRef(false);
 
   // Editable response state
   const [editedText, setEditedText] = useState("");
@@ -75,8 +77,10 @@ export default function ResponsesPage() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setResponses(data.responses || []);
+      return data.responses || [];
     } catch {
       toast.error("Failed to load responses");
+      return [];
     }
   }, [projectId]);
 
@@ -126,7 +130,6 @@ export default function ResponsesPage() {
   );
 
   const approvedCount = responses.filter((r) => r.status === "approved").length;
-  const totalResponses = responses.length;
   const progressPercent =
     requirements.length > 0
       ? Math.round((approvedCount / requirements.length) * 100)
@@ -168,42 +171,86 @@ export default function ResponsesPage() {
     }
   }
 
-  async function handleGenerateAll() {
-    setGeneratingAll(true);
+  async function generateOneResponse(requirementId: string): Promise<RfpResponse | null> {
     try {
       const res = await fetch("/api/rfp/responses/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId }),
+        body: JSON.stringify({ project_id: projectId, requirement_id: requirementId }),
       });
-      if (!res.ok) throw new Error();
-      toast.success("Generating responses for all requirements...");
-      // Poll for updates
-      setTimeout(() => fetchResponses(), 5000);
-      setTimeout(() => fetchResponses(), 15000);
+      if (!res.ok) {
+        const data = await res.json();
+        console.error(`Generate failed for ${requirementId}:`, data.error);
+        return null;
+      }
+      const data = await res.json();
+      return data.response;
     } catch {
-      toast.error("Failed to generate responses");
-    } finally {
-      setGeneratingAll(false);
+      return null;
     }
+  }
+
+  async function handleGenerateAll() {
+    // Find requirements that don't have responses yet
+    const existingReqIds = new Set(responses.map((r) => r.requirement_id));
+    const toGenerate = requirements.filter((r) => !existingReqIds.has(r.requirement_id));
+
+    if (toGenerate.length === 0) {
+      toast.success("All requirements already have responses!");
+      return;
+    }
+
+    setGeneratingAll(true);
+    cancelRef.current = false;
+    setGeneratingProgress({ done: 0, total: toGenerate.length });
+    toast.success(`Generating ${toGenerate.length} responses — this will take a few minutes...`);
+
+    let completed = 0;
+
+    for (const req of toGenerate) {
+      if (cancelRef.current) {
+        toast.success(`Stopped. Generated ${completed} of ${toGenerate.length} responses.`);
+        break;
+      }
+
+      const response = await generateOneResponse(req.requirement_id);
+      completed++;
+      setGeneratingProgress({ done: completed, total: toGenerate.length });
+
+      if (response) {
+        setResponses((prev) => [...prev, response]);
+      }
+    }
+
+    if (!cancelRef.current) {
+      toast.success(`Done! Generated ${completed} responses.`);
+    }
+    setGeneratingAll(false);
+  }
+
+  function handleCancelGeneration() {
+    cancelRef.current = true;
+    toast.success("Stopping after current response finishes...");
   }
 
   async function handleRegenerate(requirementId: string) {
     setRegeneratingId(requirementId);
     try {
-      const res = await fetch("/api/rfp/responses/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_id: projectId,
-          requirement_id: requirementId,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      toast.success("Regenerating response...");
-      setTimeout(() => fetchResponses(), 5000);
-    } catch {
-      toast.error("Failed to regenerate response");
+      const response = await generateOneResponse(requirementId);
+      if (response) {
+        setResponses((prev) => {
+          const filtered = prev.filter((r) => r.requirement_id !== requirementId);
+          return [...filtered, response];
+        });
+        // Update editor if this is the selected requirement
+        if (selectedReqId === requirementId) {
+          setEditedText(response.edited_text || response.draft_text || "");
+          setEditedStatus(response.status || "draft");
+        }
+        toast.success("Response regenerated");
+      } else {
+        toast.error("Failed to regenerate response");
+      }
     } finally {
       setRegeneratingId(null);
     }
@@ -283,18 +330,24 @@ export default function ResponsesPage() {
             {project?.name} - Responses
           </h1>
           <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              onClick={handleGenerateAll}
-              disabled={generatingAll}
-            >
-              {generatingAll ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
+            {generatingAll ? (
+              <Button
+                variant="secondary"
+                onClick={handleCancelGeneration}
+              >
+                <Square size={16} />
+                Stop ({generatingProgress.done}/{generatingProgress.total})
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={handleGenerateAll}
+                disabled={generatingAll}
+              >
                 <Sparkles size={16} />
-              )}
-              Generate All
-            </Button>
+                Generate All
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={handleExport}
@@ -319,22 +372,40 @@ export default function ResponsesPage() {
       <div className="bg-navy-800 border border-navy-700 rounded-xl p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-slate-300">
-            {approvedCount} of {requirements.length} responses approved
+            {generatingAll ? (
+              <>Generating: {generatingProgress.done} of {generatingProgress.total} responses...</>
+            ) : (
+              <>{approvedCount} of {requirements.length} responses approved</>
+            )}
           </span>
           <span className="text-sm font-medium text-white">
-            {progressPercent}%
+            {generatingAll
+              ? `${Math.round((generatingProgress.done / Math.max(generatingProgress.total, 1)) * 100)}%`
+              : `${progressPercent}%`
+            }
           </span>
         </div>
         <div className="w-full h-2 bg-navy-900 rounded-full overflow-hidden">
           <div
-            className="h-full bg-accent-blue rounded-full transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
+            className={`h-full rounded-full transition-all duration-500 ${
+              generatingAll ? "bg-yellow-500" : "bg-accent-blue"
+            }`}
+            style={{
+              width: generatingAll
+                ? `${Math.round((generatingProgress.done / Math.max(generatingProgress.total, 1)) * 100)}%`
+                : `${progressPercent}%`,
+            }}
           />
         </div>
+        {generatingAll && (
+          <p className="text-xs text-slate-500 mt-2">
+            Each response takes ~3-5 seconds. You can stop anytime and resume later.
+          </p>
+        )}
       </div>
 
       {/* Split layout */}
-      <div className="flex gap-4 h-[calc(100vh-280px)]">
+      <div className="flex gap-4 h-[calc(100vh-300px)]">
         {/* Left panel - requirements list */}
         <div className="w-[380px] flex-shrink-0 bg-navy-800 border border-navy-700 rounded-xl overflow-y-auto">
           {Object.entries(sections).map(([section, reqs]) => (
@@ -455,13 +526,13 @@ export default function ResponsesPage() {
                       ) : (
                         <Sparkles size={14} />
                       )}
-                      Regenerate
+                      {selectedResp ? "Regenerate" : "Generate"}
                     </Button>
                   </div>
                 </div>
                 <textarea
                   className="w-full px-4 py-3 bg-navy-900 border border-navy-700 rounded-lg text-slate-200 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue resize-y min-h-[300px]"
-                  placeholder="Response text will appear here after generation..."
+                  placeholder="Click Generate to create a response for this requirement..."
                   value={editedText}
                   onChange={(e) => setEditedText(e.target.value)}
                 />

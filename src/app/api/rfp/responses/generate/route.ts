@@ -115,10 +115,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { project_id, requirement_ids } = body;
+    const { project_id, requirement_id } = body;
 
     if (!project_id) {
       return NextResponse.json({ error: "project_id is required" }, { status: 400 });
+    }
+    if (!requirement_id) {
+      return NextResponse.json({ error: "requirement_id is required" }, { status: 400 });
     }
 
     const supabase = createServerSupabase();
@@ -135,24 +138,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Fetch requirements (all or specific ones)
-    let requirementQuery = supabase
+    // Fetch the specific requirement
+    const { data: requirement, error: reqError } = await supabase
       .from("rfp_requirements")
       .select("*")
+      .eq("requirement_id", requirement_id)
       .eq("project_id", project_id)
-      .order("sort_order", { ascending: true });
+      .single();
 
-    if (requirement_ids && Array.isArray(requirement_ids) && requirement_ids.length > 0) {
-      requirementQuery = requirementQuery.in("requirement_id", requirement_ids);
+    if (reqError || !requirement) {
+      return NextResponse.json({ error: "Requirement not found" }, { status: 404 });
     }
 
-    const { data: requirements, error: reqError } = await requirementQuery;
+    // Check if a response already exists — delete it for regeneration
+    const { data: existing } = await supabase
+      .from("rfp_responses")
+      .select("response_id")
+      .eq("requirement_id", requirement_id)
+      .eq("project_id", project_id)
+      .single();
 
-    if (reqError || !requirements || requirements.length === 0) {
-      return NextResponse.json(
-        { error: "No requirements found for this project" },
-        { status: 404 }
-      );
+    if (existing) {
+      await supabase.from("rfp_responses").delete().eq("response_id", existing.response_id);
     }
 
     // Fetch company profile if set
@@ -173,79 +180,49 @@ export async function POST(request: NextRequest) {
       .eq("clerk_user_id", userId);
 
     const allKB: KnowledgeBaseEntry[] = kbEntries || [];
+    const relevantKB = getRelevantKBEntries(requirement, allKB);
+    const userMessage = buildPromptForRequirement(
+      requirement,
+      profile,
+      relevantKB,
+      project.contract_type
+    );
 
-    // Generate responses for each requirement
-    const generatedResponses = [];
+    const draftText = await askClaude(RESPONSE_GENERATION_PROMPT, userMessage, {
+      maxTokens: 4096,
+      temperature: 0.3,
+    });
 
-    for (const requirement of requirements) {
-      // Check if a response already exists
-      const { data: existing } = await supabase
-        .from("rfp_responses")
-        .select("response_id")
-        .eq("requirement_id", requirement.requirement_id)
-        .eq("project_id", project_id)
-        .single();
+    const kbSourceId = relevantKB.length > 0 ? relevantKB[0].entry_id : null;
 
-      if (existing) {
-        continue;
-      }
-
-      const relevantKB = getRelevantKBEntries(requirement, allKB);
-      const userMessage = buildPromptForRequirement(
-        requirement,
-        profile,
-        relevantKB,
-        project.contract_type
-      );
-
-      try {
-        const draftText = await askClaude(RESPONSE_GENERATION_PROMPT, userMessage, {
-          maxTokens: 4096,
-          temperature: 0.3,
-        });
-
-        const kbSourceId = relevantKB.length > 0 ? relevantKB[0].entry_id : null;
-
-        // Update times_used for KB entries that were referenced
-        if (relevantKB.length > 0) {
-          for (const kb of relevantKB) {
-            await supabase
-              .from("rfp_knowledge_base")
-              .update({ times_used: (kb.times_used || 0) + 1 })
-              .eq("entry_id", kb.entry_id);
-          }
-        }
-
-        const { data: response, error: insertError } = await supabase
-          .from("rfp_responses")
-          .insert({
-            requirement_id: requirement.requirement_id,
-            project_id,
-            draft_text: draftText,
-            status: "draft",
-            ai_confidence: relevantKB.length > 0 ? 0.8 : 0.6,
-            kb_source_id: kbSourceId,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error(`Failed to insert response for ${requirement.requirement_id}:`, insertError);
-          continue;
-        }
-
-        generatedResponses.push(response);
-      } catch (genErr) {
-        console.error(`Failed to generate response for ${requirement.requirement_id}:`, genErr);
-        continue;
+    // Update times_used for KB entries that were referenced
+    if (relevantKB.length > 0) {
+      for (const kb of relevantKB) {
+        await supabase
+          .from("rfp_knowledge_base")
+          .update({ times_used: (kb.times_used || 0) + 1 })
+          .eq("entry_id", kb.entry_id);
       }
     }
 
-    return NextResponse.json({
-      generated_count: generatedResponses.length,
-      total_requirements: requirements.length,
-      responses: generatedResponses,
-    });
+    const { data: response, error: insertError } = await supabase
+      .from("rfp_responses")
+      .insert({
+        requirement_id,
+        project_id,
+        draft_text: draftText,
+        status: "draft",
+        ai_confidence: relevantKB.length > 0 ? 0.8 : 0.6,
+        kb_source_id: kbSourceId,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ response });
   } catch (err) {
     console.error("POST /api/rfp/responses/generate error:", err);
     return NextResponse.json({
