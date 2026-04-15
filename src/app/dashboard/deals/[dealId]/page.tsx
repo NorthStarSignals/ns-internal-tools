@@ -274,7 +274,7 @@ export default function DealDetailPage() {
       });
       if (!res.ok) throw new Error("Analysis failed");
       const data = await res.json();
-      setRedFlags(data.flags || []);
+      setRedFlags(data.red_flags || data.flags || []);
       toast.success("Analysis complete");
     } catch {
       toast.error("Analysis failed");
