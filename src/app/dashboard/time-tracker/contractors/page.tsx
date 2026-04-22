@@ -301,16 +301,15 @@ function ContractorsPageContent() {
                         >
                           <Pencil size={14} />
                         </Button>
-                        {user.status === "active" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeactivateUser(user)}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <UserX size={14} />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeactivateUser(user)}
+                          className="text-red-400 hover:text-red-300"
+                          title="Delete team member"
+                        >
+                          <UserX size={14} />
+                        </Button>
                       </div>
                     </td>
                   </tr>
