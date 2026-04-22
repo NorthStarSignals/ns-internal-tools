@@ -145,24 +145,44 @@ export async function DELETE(
     }
 
     const { userId: targetUserId } = await params;
+
+    // Safety rail: admins can't delete themselves. Would lock them out of
+    // the tool with no way to reinstate without going directly to the DB.
+    if (admin.id === targetUserId) {
+      return NextResponse.json(
+        { error: "You can't delete your own account." },
+        { status: 400 }
+      );
+    }
+
     const supabase = createServerSupabase();
 
-    const { data, error } = await supabase
+    // Fetch first so we can return the deleted row's details (for the toast).
+    // tt_time_entries.user_id has ON DELETE CASCADE so their time history
+    // gets wiped automatically.
+    const { data: existing } = await supabase
       .from("tt_users")
-      .update({ status: "inactive" })
+      .select("id, name, email")
       .eq("id", targetUserId)
-      .select()
       .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const { error } = await supabase
+      .from("tt_users")
+      .delete()
+      .eq("id", targetUserId);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (!data) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ message: "User deactivated", user: data });
+    return NextResponse.json({
+      message: "User permanently deleted",
+      deleted: existing,
+    });
   } catch (err) {
     console.error("DELETE /api/time-tracker/users/[userId] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { useCurrentTTUser } from "@/hooks/useCurrentTTUser";
 import {
   FileText,
   Building2,
@@ -25,6 +26,8 @@ import {
   Receipt,
 } from "lucide-react";
 
+// RFP Engine and Deal Screener are admin-only sections — hidden entirely
+// from members (they're not team-work tools, they're Malik's sales+strategy).
 const rfpLinks = [
   { href: "/dashboard/rfp", label: "Projects", icon: FileText },
   { href: "/dashboard/rfp/profiles", label: "Company Profiles", icon: Building2 },
@@ -36,7 +39,10 @@ const dealLinks = [
   { href: "/dashboard/deals/benchmarks", label: "Benchmarks", icon: BarChart3 },
 ];
 
-const timeTrackerLinks = [
+// Time Tracker: some links every member uses, others (All Entries, Team,
+// Projects, Pay Reports) are manager-level admin tools.
+type TTLink = { href: string; label: string; icon: typeof Clock; adminOnly?: boolean };
+const timeTrackerLinks: TTLink[] = [
   { href: "/dashboard/time-tracker", label: "Timer", icon: Clock },
   { href: "/dashboard/time-tracker/my-hours", label: "My Hours", icon: ClipboardList },
   { href: "/dashboard/time-tracker/my-pay", label: "My Pay", icon: DollarSign },
@@ -50,6 +56,14 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAdmin } = useCurrentTTUser();
+
+  // Members only see the Time Tracker section. Dashboard, RFP Engine, and
+  // Deal Screener are all admin-scope. We still show the section labels only
+  // where the section will render at least one link for the current role.
+  const visibleTTLinks = timeTrackerLinks.filter(
+    (l) => isAdmin || !l.adminOnly
+  );
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
@@ -69,22 +83,24 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
-        <div>
-          <Link
-            href="/dashboard"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-              pathname === "/dashboard"
-                ? "bg-accent-blue/20 text-accent-blue"
-                : "text-slate-300 hover:bg-navy-700 hover:text-white"
-            )}
-          >
-            <LayoutDashboard size={18} />
-            {!collapsed && "Dashboard"}
-          </Link>
-        </div>
+        {isAdmin && (
+          <div>
+            <Link
+              href="/dashboard"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                pathname === "/dashboard"
+                  ? "bg-accent-blue/20 text-accent-blue"
+                  : "text-slate-300 hover:bg-navy-700 hover:text-white"
+              )}
+            >
+              <LayoutDashboard size={18} />
+              {!collapsed && "Dashboard"}
+            </Link>
+          </div>
+        )}
 
-        <div>
+        {isAdmin && (<div>
           {!collapsed && (
             <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
               RFP Engine
@@ -108,9 +124,9 @@ export default function Sidebar() {
               {!collapsed && link.label}
             </Link>
           ))}
-        </div>
+        </div>)}
 
-        <div>
+        {isAdmin && (<div>
           {!collapsed && (
             <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
               Deal Screener
@@ -134,7 +150,7 @@ export default function Sidebar() {
               {!collapsed && link.label}
             </Link>
           ))}
-        </div>
+        </div>)}
 
         <div>
           {!collapsed && (
@@ -142,7 +158,7 @@ export default function Sidebar() {
               Time Tracker
             </p>
           )}
-          {timeTrackerLinks.map((link) => (
+          {visibleTTLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}

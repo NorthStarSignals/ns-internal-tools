@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import AdminGuard from "@/components/AdminGuard";
 
 interface PayReportRow {
   user_name: string;
@@ -27,7 +28,7 @@ interface PayReportData {
   grand_total: number;
 }
 
-export default function PayReportsPage() {
+function PayReportsPageContent() {
   const [report, setReport] = useState<PayReportData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -210,5 +211,14 @@ export default function PayReportsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+
+export default function PayReportsPage() {
+  return (
+    <AdminGuard>
+      <PayReportsPageContent />
+    </AdminGuard>
   );
 }

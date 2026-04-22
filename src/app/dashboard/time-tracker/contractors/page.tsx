@@ -15,6 +15,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import AdminGuard from "@/components/AdminGuard";
 
 interface TTUser {
   id: string;
@@ -38,7 +39,7 @@ interface TimeEntry {
   hours: number;
 }
 
-export default function ContractorsPage() {
+function ContractorsPageContent() {
   const [users, setUsers] = useState<TTUser[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,15 +172,15 @@ export default function ContractorsPage() {
         { method: "DELETE" }
       );
       if (res.ok) {
-        toast.success("Team member deactivated");
+        toast.success("Team member deleted");
         setDeactivateUser(null);
         fetchData();
       } else {
         const err = await res.json();
-        toast.error(err.error || "Failed to deactivate");
+        toast.error(err.error || "Failed to delete");
       }
     } catch {
-      toast.error("Failed to deactivate");
+      toast.error("Failed to delete");
     } finally {
       setDeactivating(false);
     }
@@ -388,20 +389,26 @@ export default function ContractorsPage() {
         </div>
       </Modal>
 
-      {/* Deactivate Confirmation */}
+      {/* Delete Confirmation */}
       <Modal
         open={!!deactivateUser}
         onClose={() => setDeactivateUser(null)}
-        title="Deactivate Team Member"
+        title="Delete Team Member"
       >
         <div className="space-y-4">
           <p className="text-slate-300">
-            Are you sure you want to deactivate{" "}
+            Permanently delete{" "}
             <span className="text-white font-medium">
               {deactivateUser?.name}
             </span>
-            ? They will no longer be able to log time.
+            ?
           </p>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-200">
+            <strong className="block mb-1">This cannot be undone.</strong>
+            The user account and <em>all</em> their time entries
+            (submitted, approved, and draft) will be permanently removed
+            from the database.
+          </div>
           <div className="flex gap-3 justify-end pt-2">
             <Button variant="ghost" onClick={() => setDeactivateUser(null)}>
               Cancel
@@ -414,11 +421,20 @@ export default function ContractorsPage() {
               {deactivating && (
                 <Loader2 size={16} className="animate-spin" />
               )}
-              Deactivate
+              Delete permanently
             </Button>
           </div>
         </div>
       </Modal>
     </div>
+  );
+}
+
+
+export default function ContractorsPage() {
+  return (
+    <AdminGuard>
+      <ContractorsPageContent />
+    </AdminGuard>
   );
 }

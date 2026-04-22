@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import AdminGuard from "@/components/AdminGuard";
 
 interface Project {
   id: string;
@@ -29,7 +30,7 @@ interface TimeEntry {
   hours: number;
 }
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [monthEntries, setMonthEntries] = useState<TimeEntry[]>([]);
@@ -308,5 +309,14 @@ export default function ProjectsPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+
+export default function ProjectsPage() {
+  return (
+    <AdminGuard>
+      <ProjectsPageContent />
+    </AdminGuard>
   );
 }

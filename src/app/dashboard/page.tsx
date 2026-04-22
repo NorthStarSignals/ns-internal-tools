@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Search, Plus, ArrowRight } from "lucide-react";
+import AdminGuard from "@/components/AdminGuard";
 
 interface DashboardStats {
   rfp: { active: number; totalRequirements: number; pendingResponses: number };
   deals: { active: number; criticalFlags: number; completed: number };
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const [stats, setStats] = useState<DashboardStats>({
     rfp: { active: 0, totalRequirements: 0, pendingResponses: 0 },
     deals: { active: 0, criticalFlags: 0, completed: 0 },
@@ -151,5 +152,13 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AdminGuard>
+      <DashboardPageContent />
+    </AdminGuard>
   );
 }

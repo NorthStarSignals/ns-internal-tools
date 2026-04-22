@@ -16,6 +16,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import AdminGuard from "@/components/AdminGuard";
 
 interface TTUser {
   id: string;
@@ -57,7 +58,7 @@ const statusBadge = (status: string) => {
 type SortKey = "date" | "hours" | "user" | "project" | "status";
 type SortDir = "asc" | "desc";
 
-export default function EntriesPage() {
+function EntriesPageContent() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [users, setUsers] = useState<TTUser[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -536,5 +537,14 @@ export default function EntriesPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+
+export default function EntriesPage() {
+  return (
+    <AdminGuard>
+      <EntriesPageContent />
+    </AdminGuard>
   );
 }
