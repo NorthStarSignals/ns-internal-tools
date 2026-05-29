@@ -53,12 +53,22 @@ export default function MyHoursPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Filters
+  // Default to "last 90 days" instead of "this month" so entries logged for
+  // dates in the previous month don't silently disappear. Bug: My Pay
+  // (which loads 6 months) was showing total hours including prior-month
+  // entries, while My Hours hid them — confusing "where did my hours go?".
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const ninetyDaysAgo = new Date(now);
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const [dateFrom, setDateFrom] = useState(
-    monthStart.toISOString().split("T")[0]
+    ninetyDaysAgo.toISOString().split("T")[0]
   );
-  const [dateTo, setDateTo] = useState(now.toISOString().split("T")[0]);
+  // dateTo intentionally unbounded by default — set to a far-future date so
+  // entries dated "today" or "tomorrow" aren't dropped by timezone drift
+  // between client local-time and ISO UTC date.
+  const oneYearOut = new Date(now);
+  oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+  const [dateTo, setDateTo] = useState(oneYearOut.toISOString().split("T")[0]);
   const [filterProject, setFilterProject] = useState("");
 
   // Edit modal
