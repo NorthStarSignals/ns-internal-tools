@@ -15,7 +15,7 @@ import {
   BarChart3,
   Loader2,
 } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, todayLocalISO } from "@/lib/utils";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -80,10 +80,10 @@ function TimerView({ user }: { user: TTUser }) {
   const [clockOutNotes, setClockOutNotes] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Manual entry state
-  const [manualDate, setManualDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  // Manual entry state. Default to LOCAL today (not UTC) so logging late in
+  // the evening doesn't pre-fill tomorrow's date — Aaron's "date pushing
+  // back an hour" report.
+  const [manualDate, setManualDate] = useState(todayLocalISO());
   const [manualProject, setManualProject] = useState("");
   const [manualHours, setManualHours] = useState("1");
   const [manualNotes, setManualNotes] = useState("");
@@ -109,6 +109,15 @@ function TimerView({ user }: { user: TTUser }) {
     }
   }, [selectedProject]);
 
+  // Aaron (6/1) — the running timer vanished when navigating Timer → My Hours
+  // → back. The server persists the active timer fine, but on remount
+  // `activeTimer` starts null and the async fetch below takes a beat to
+  // resolve, so the "Ready to work?" card flashes in and the live timer
+  // looks gone. We cache the full active-timer object in localStorage and
+  // restore it synchronously on mount (see the mount effect) so the running
+  // timer shows instantly; this fetch then reconciles against the server.
+  const TT_CACHE_KEY = "tt_active_timer";
+
   const fetchActiveTimer = useCallback(async () => {
     try {
       const res = await fetch("/api/time-tracker/timer");
@@ -117,16 +126,16 @@ function TimerView({ user }: { user: TTUser }) {
         if (data.active_timer) {
           setActiveTimer(data.active_timer);
           localStorage.setItem(
-            "tt_timer_start",
-            data.active_timer.start_time
+            TT_CACHE_KEY,
+            JSON.stringify(data.active_timer)
           );
         } else {
           setActiveTimer(null);
-          localStorage.removeItem("tt_timer_start");
+          localStorage.removeItem(TT_CACHE_KEY);
         }
       }
     } catch {
-      /* ignore */
+      /* ignore — a transient fetch failure keeps the cached timer on screen */
     }
   }, []);
 
@@ -165,6 +174,17 @@ function TimerView({ user }: { user: TTUser }) {
   }, []);
 
   useEffect(() => {
+    // Instant restore from localStorage so the running timer doesn't blink
+    // out on every navigation back to this page. Runs in an effect (not a
+    // lazy useState initializer) to avoid an SSR/hydration mismatch. The
+    // fetchActiveTimer call right after is authoritative and will clear this
+    // if the timer was actually stopped elsewhere.
+    try {
+      const cached = localStorage.getItem(TT_CACHE_KEY);
+      if (cached) setActiveTimer(JSON.parse(cached) as ActiveTimer);
+    } catch {
+      /* ignore malformed cache */
+    }
     fetchProjects();
     fetchActiveTimer();
     fetchStats();
@@ -242,7 +262,7 @@ function TimerView({ user }: { user: TTUser }) {
         setActiveTimer(null);
         setShowClockOutNotes(false);
         setClockOutNotes("");
-        localStorage.removeItem("tt_timer_start");
+        localStorage.removeItem(TT_CACHE_KEY);
         fetchStats();
       } else {
         const err = await res.json();
